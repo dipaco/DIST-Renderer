@@ -613,9 +613,9 @@ class SDFRenderer(object):
         stride = grid_map[0,1,0] - grid_map[0,0,0]
         new_h, new_w = np.ceil(h / scale), np.ceil(w / scale)
 
-        new_grid_map = self.get_meshgrid((new_h, new_w))
+        new_grid_map = self.get_meshgrid((new_h, new_w)).to(grid_map)
         new_grid_map = (scale * stride) * new_grid_map + ((scale * stride) - 1) / 2
-        new_grid_map = new_grid_map.to(grid_map.get_device())
+        #new_grid_map = new_grid_map.to(grid_map.get_device())
 
         if stride == 1:
             grid_map_meshgrid = grid_map
@@ -676,8 +676,8 @@ class SDFRenderer(object):
         '''
         from torch_scatter import scatter_max
         with torch.no_grad():
-            new_valid_mask, _ = scatter_max(valid_mask, index_map)
-        return new_valid_mask
+            new_valid_mask, _ = scatter_max(valid_mask.int(), index_map)
+        return new_valid_mask.bool()
 
     def upsample_zdepth_and_recalib(self, zdepth_lowres, index_map, recalib_map):
         zdepth_highres = zdepth_lowres[:, index_map]
@@ -870,8 +870,8 @@ class SDFRenderer(object):
         Zdepth = Zdepth.reshape(-1) # (H*W)
 
         ## update valid_mask
-        valid_mask = valid_mask.clone()
-        valid_mask[valid_mask] = valid_mask_render
+        idx = valid_mask.clone()
+        valid_mask[idx] = valid_mask_render
         profiler.report_process('[DEPTH] finalize time\t')
         if no_grad_depth:
             Zdepth = Zdepth.detach()
