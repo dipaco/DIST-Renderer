@@ -9,6 +9,7 @@ from core.utils.render_utils import depth2normal
 import copy
 import time
 
+
 class SDFRenderer(object):
     def __init__(self, decoder, intrinsic, img_hw=None, transform_matrix=None, march_step=50, buffer_size=5, ray_marching_ratio=1.5, use_depth2normal=False, max_sample_dist=0.2, radius=1.0, threshold=5e-5, scale_list=[4, 2, 1], march_step_list=[3, 3, -1], use_gpu=True, is_eval=True):
         self.decoder = decoder
