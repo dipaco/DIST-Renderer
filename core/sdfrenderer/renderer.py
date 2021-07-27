@@ -11,7 +11,7 @@ import time
 
 
 class SDFRenderer(object):
-    def __init__(self, decoder, intrinsic, img_hw=None, transform_matrix=None, march_step=50, buffer_size=5, ray_marching_ratio=1.5, use_depth2normal=False, max_sample_dist=0.2, radius=1.0, threshold=5e-5, scale_list=[4, 2, 1], march_step_list=[3, 3, -1], use_gpu=True, is_eval=True):
+    def __init__(self, decoder, intrinsic, img_hw=None, transform_matrix=None, march_step=50, buffer_size=5, ray_marching_ratio=1.5, use_depth2normal=False, max_sample_dist=0.2, radius=1.0, threshold=5e-5, scale_list=[4, 2, 1], march_step_list=[3, 3, -1], use_gpu=True, is_eval=True, compute_normals=False):
         self.decoder = decoder
         self.device = next(self.decoder.parameters()).get_device()
         if is_eval:
@@ -25,6 +25,7 @@ class SDFRenderer(object):
         self.threshold = threshold
         self.scale_list = scale_list
         self.march_step_list = march_step_list
+        self.compute_normals = compute_normals
         if type(intrinsic) == torch.Tensor:
             intrinsic = intrinsic.detach().cpu().numpy()
         self.intrinsic = intrinsic
@@ -797,7 +798,7 @@ class SDFRenderer(object):
 
                 # map down global info to (N)
                 sdf_list = torch.cat([sdf_list[:, valid_mask], sdf_list_now], 0)
-                points_list = torch.cat([points_list[:, valid_mask, :], points_list_now], 0)
+                points_list = torch.cat([points_list[:, valid_mask.clone(), :], points_list_now], 0)
                 zdepth_list_now = marching_zdepth_list_now + init_zdepth_now[valid_mask]
                 zdepth_list = torch.cat([zdepth_list[:, valid_mask], zdepth_list_now], 0)
 
@@ -970,15 +971,18 @@ class SDFRenderer(object):
         depth = depth.reshape(h, w)
 
         # render normal
-        if self.use_depth2normal:
-            f_x_pix = self.K.detach().cpu().numpy()[0,0]
-            f_y_pix = self.K.detach().cpu().numpy()[1,1]
-            normal = depth2normal(depth, f_x_pix, f_y_pix)
+        if self.compute_normals:
+            if self.use_depth2normal:
+                f_x_pix = self.K.detach().cpu().numpy()[0,0]
+                f_y_pix = self.K.detach().cpu().numpy()[1,1]
+                normal = depth2normal(depth, f_x_pix, f_y_pix)
+            else:
+                normal = self.render_normal(latent, R, T, Zdepth, valid_mask, clamp_dist=clamp_dist, no_grad=no_grad_normal, normalize=normalize_normal, use_transform=use_transform) # (3, H*W)
+                normal = torch.matmul(R, normal) # (3, H*W)
+                normal[0,:] = normal[0,:].clone() * (-1) # transformed the direction to align with rendering engine (left-hand sided).
+                normal = normal.reshape(3, h, w).permute(1,2,0)
         else:
-            normal = self.render_normal(latent, R, T, Zdepth, valid_mask, clamp_dist=clamp_dist, no_grad=no_grad_normal, normalize=normalize_normal, use_transform=use_transform) # (3, H*W)
-            normal = torch.matmul(R, normal) # (3, H*W)
-            normal[0,:] = normal[0,:].clone() * (-1) # transformed the direction to align with rendering engine (left-hand sided).
-            normal = normal.reshape(3, h, w).permute(1,2,0)
+            normal = None
         profiler.report_process('render normal time')
 
         # (optional) forward sampling inside the surface
