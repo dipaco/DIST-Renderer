@@ -226,7 +226,7 @@ class SDFRenderer(object):
         # Apply transformation for dynamics
         #points = point_rot @ points + point_trans
 #        points_before = points.clone()
-#        points = points + point_trans
+        points = points + point_trans
 #        import pdb
 #        pdb.set_trace()
         return points
