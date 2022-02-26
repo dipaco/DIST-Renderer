@@ -224,9 +224,9 @@ class SDFRenderer(object):
             points.requires_grad=True
 
         # Apply transformation for dynamics
-        #points = point_rot @ points + point_trans
+        points = point_rot @ (points - point_trans['rot_center']) + point_trans['rot_center'] + point_trans['trans']
 #        points_before = points.clone()
-        points = points + point_trans
+        #points = points + point_trans
 #        import pdb
 #        pdb.set_trace()
         return points
@@ -531,7 +531,6 @@ class SDFRenderer(object):
 
         marching_zdepth_list, sdf_list, points_list = [], [], []
         marching_zdepth = torch.zeros_like(init_zdepth)
-
         valid_mask_max_marching_zdepth = (marching_zdepth + init_zdepth < maxbound_zdepth)
         unfinished_mask = valid_mask_max_marching_zdepth # (N)
         for i in range(march_step):
@@ -539,7 +538,6 @@ class SDFRenderer(object):
             cam_rays_now = valid_cam_rays[:, unfinished_mask] # (3, K)
             init_zdepth_now = init_zdepth[unfinished_mask] # (K)
             marching_zdepth_now = marching_zdepth[unfinished_mask] # (K)
-
             # get corresponding sdf value
             points_now = self.generate_point_samples(cam_pos, cam_rays_now, init_zdepth_now + marching_zdepth_now, point_trans, point_rot, inv_transform=use_transform) # (3, K)
             if no_grad:
